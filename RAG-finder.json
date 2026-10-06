@@ -1,0 +1,653 @@
+{
+  "name": "RAG-finder",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -768,
+        -256
+      ],
+      "id": "281359e6-55f8-4dcf-a8c6-3a6c2d8c1f6e",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "https://docs.google.com/document/d/1weGEu5VFuCBMg_eVEnKARiFwa_cX_QqhPPr42T2Dbtw/edit?tab=t.0#heading=h.pd84ublmj4ur",
+          "mode": "url"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -560,
+        -256
+      ],
+      "id": "f7a1f0aa-06ad-4839-97d9-04ee732c80fa",
+      "name": "Download file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "0zAfYpHMZS2giLK9",
+          "name": "Google Drive account 494"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "tableName": {
+          "__rl": true,
+          "value": "documents",
+          "mode": "list",
+          "cachedResultName": "documents"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        -368,
+        -256
+      ],
+      "id": "a7de5a2f-7706-48a1-9448-02e11e3f22e4",
+      "name": "Supabase Vector Store",
+      "credentials": {
+        "supabaseApi": {
+          "id": "v0qfsup8vWUhp9gC",
+          "name": "Supabase account 60466"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "dataType": "binary",
+        "loader": "docxLoader",
+        "textSplittingMode": "custom",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        -256,
+        -96
+      ],
+      "id": "922c4503-6b6a-4e5e-88f8-f796248f46ec",
+      "name": "Default Data Loader"
+    },
+    {
+      "parameters": {
+        "chunkSize": 500,
+        "chunkOverlap": 100,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        -256,
+        64
+      ],
+      "id": "fdedf20c-e1a3-4ca4-b213-80ba48304f4e",
+      "name": "Recursive Character Text Splitter"
+    },
+    {
+      "parameters": {
+        "modelName": "embed-english-v3.0"
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsCohere",
+      "typeVersion": 1,
+      "position": [
+        -416,
+        -96
+      ],
+      "id": "8e95db87-1656-4d76-8e92-1a8e3a32656f",
+      "name": "Embeddings Cohere",
+      "credentials": {
+        "cohereApi": {
+          "id": "KDuGYAwjRRdhQvTj",
+          "name": "Cohere account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "16rTVRsNoASZ4mpPzFEJCHJiNGu2C0g7nPrIz0vunLt4",
+          "mode": "list",
+          "cachedResultName": "Questions_CSV",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16rTVRsNoASZ4mpPzFEJCHJiNGu2C0g7nPrIz0vunLt4/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1231941560,
+          "mode": "list",
+          "cachedResultName": "questions_tableCSV",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16rTVRsNoASZ4mpPzFEJCHJiNGu2C0g7nPrIz0vunLt4/edit#gid=1231941560"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -768,
+        352
+      ],
+      "id": "c8f54844-5418-47fa-85ee-d20719092eef",
+      "name": "Get row(s) in sheet",
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "0nozAKeeq5hfTEcj",
+          "name": "Google Sheets account 8062146"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -368,
+        352
+      ],
+      "id": "b0c8fcab-9daf-4a42-915b-3372db2e7285",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.row_id.map((id, i) => `row_id: ${id}, question: ${$json.Question[i]}`).join('\\n') }}",
+        "options": {
+          "systemMessage": "Ты — ассистент, который отвечает на СПИСОК вопросов на основе информации, найденной через инструмент поиска (Supabase Vector Store).\n\nТебе передан список из НЕСКОЛЬКИХ вопросов, каждый со своим row_id. Ты ДОЛЖЕН ответить на КАЖДЫЙ вопрос из списка, не пропуская ни одного.\n\nДля каждого вопроса:\n1. Используй инструмент поиска, чтобы найти релевантный контекст\n2. Если вопрос про число/год/процент/сумму — ответ должен быть ТОЛЬКО этим значением\n3. Если информации нет — напиши \"не найдено\"\n\nКРИТИЧЕСКИ ВАЖНО: верни результат СТРОГО в виде JSON-массива со ВСЕМИ обработанными вопросами, без markdown-обёртки, без пояснений до или после текста, ровно в этом формате:\n[{\"row_id\": 11, \"answer\": \"1997\"}, {\"row_id\": 12, \"answer\": \"15.3\"}, {\"row_id\": 13, \"answer\": \"...\"}]\n\nКоличество элементов в твоём JSON-массиве ДОЛЖНО совпадать с количеством вопросов в списке."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        32,
+        432
+      ],
+      "id": "d97c095d-814a-4238-860b-7519814ed68f",
+      "name": "AI Agent",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 1500
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-20b",
+        "options": {
+          "temperature": 0.1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -144,
+        672
+      ],
+      "id": "fccab793-52f8-4231-9cab-5d4ffadbe8b2",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "Qut1U05ljKyE9XAi",
+          "name": "Groq account 72"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "Search the knowledge base for relevant information from the document before answering the user's question. Use this for every question to find facts, numbers, dates, and statistics mentioned in the source material.",
+        "tableName": {
+          "__rl": true,
+          "value": "documents",
+          "mode": "list",
+          "cachedResultName": "documents"
+        },
+        "topK": 2,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        -16,
+        656
+      ],
+      "id": "c47050a3-33c2-4514-89b0-2bc79160568e",
+      "name": "Supabase Vector Store1",
+      "credentials": {
+        "supabaseApi": {
+          "id": "v0qfsup8vWUhp9gC",
+          "name": "Supabase account 60466"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "embed-english-v3.0"
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsCohere",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        816
+      ],
+      "id": "0dd6bc34-6a97-435f-a5fa-525db028c1ec",
+      "name": "Embeddings Cohere1",
+      "credentials": {
+        "cohereApi": {
+          "id": "KDuGYAwjRRdhQvTj",
+          "name": "Cohere account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Indexing"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1072,
+        -272
+      ],
+      "typeVersion": 1,
+      "id": "462628aa-1d32-48ea-bdb4-88a514826e3f",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Answering"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1072,
+        336
+      ],
+      "typeVersion": 1,
+      "id": "402a6b95-9066-4cd0-9d59-7b72024a0730",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "amount": 15
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        800,
+        768
+      ],
+      "id": "5bd32d1e-242f-4ced-b998-0b8b27d6ecf9",
+      "name": "Wait",
+      "webhookId": "af75c675-00c9-4c10-b3dd-43e9d2964060"
+    },
+    {
+      "parameters": {
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "fieldToAggregate": "row_id"
+            },
+            {
+              "fieldToAggregate": "Answer"
+            },
+            {
+              "fieldToAggregate": "Question"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        -160,
+        432
+      ],
+      "id": "02924f6f-134b-423f-8660-f485d5cf5b95",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        256
+      ],
+      "id": "f1fc0750-8851-435d-b659-a056c2db6428",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a19ae09a-e6f4-4235-81b8-513f9f434a0a",
+              "name": "row_id",
+              "value": "={{ $('Get row(s) in sheet').first().json.row_id }}",
+              "type": "string"
+            },
+            {
+              "id": "4517c7d0-57df-4e92-ad93-98d05068e61b",
+              "name": "Answer",
+              "value": "={{ $json.output }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        400,
+        1648
+      ],
+      "id": "3e435298-1812-4b23-9669-73e85d4e8bf8",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "jsCode": "let raw = $input.first().json.output;\nraw = raw.replace(/```json|```/g, '').trim();\nlet parsed = JSON.parse(raw);\n\nif (!Array.isArray(parsed)) {\n  parsed = [parsed];\n}\n\nreturn parsed.map(item => ({ json: { row_id: item.row_id, Answer: item.answer } }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        768
+      ],
+      "id": "eb8c3acb-2b21-4abf-aba3-5f25f20e310f",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "fieldToAggregate": "row_id"
+            },
+            {
+              "fieldToAggregate": "Answer"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        -160,
+        256
+      ],
+      "id": "0db0f12b-dfa9-4b79-8ab5-51e09b5b2c2b",
+      "name": "Aggregate1"
+    },
+    {
+      "parameters": {
+        "maxItems": 5
+      },
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        352
+      ],
+      "id": "9e74f954-8fb1-4154-9b8a-b79683cecd32",
+      "name": "Limit"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nreturn data.row_id.map((id, i) => ({\n  json: {\n    row_id: id,\n    Answer: data.Answer[i]\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        32,
+        256
+      ],
+      "id": "7b87a247-bd04-40cb-a26c-7511f91c716a",
+      "name": "Code in JavaScript1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Download file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download file": {
+      "main": [
+        [
+          {
+            "node": "Supabase Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Supabase Vector Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recursive Character Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Default Data Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Cohere": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Supabase Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Vector Store": {
+      "ai_tool": [
+        []
+      ],
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Aggregate1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Vector Store1": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Cohere1": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Supabase Vector Store1",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        []
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "4af66304-8898-4a29-9f89-37e7ea134a9e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f4300700b5a89163b88ad6a908ff9e3076c705e8b03a3f40f03ff2f29f7e4289"
+  },
+  "nodeGroups": [],
+  "id": "tWmzFInmGhPru5uH",
+  "tags": []
+}
